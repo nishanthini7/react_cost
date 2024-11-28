@@ -1,104 +1,120 @@
-import React from 'react';
-import ReactApexChart from 'react-apexcharts';
+import React, { useState, useEffect } from 'react';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
 
-class FlowchartPage extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      series: [{
-        name: 'Inflation',
-        data: [5.8, 3.1, 4.0, 10.1, 4.0, 3.6, 3.2, 2.3, 1.4, 0.8, 12.5, 0.2],
-      }],
-      options: {
-        chart: {
-          height: 350,
-          type: 'bar',
-        },
-        plotOptions: {
-          bar: {
-            borderRadius: 10,
-            dataLabels: {
-              position: 'top',
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend
+);
+
+const FlowChartPage = () => {
+    const [filters, setFilters] = useState({
+        account_name: '',
+        application_name: '',
+        environment: '',
+        service: '',
+    });
+    const [chartData, setChartData] = useState({
+        labels: [],
+        datasets: [
+            {
+                label: 'Total Cost',
+                data: [],
+                backgroundColor: 'rgba(75,192,192,0.6)',
             },
-          },
-        },
-        dataLabels: {
-          enabled: true,
-          formatter: function (val) {
-            return val + "%";
-          },
-          offsetY: -20,
-          style: {
-            fontSize: '12px',
-            colors: ["#304758"],
-          },
-        },
-        xaxis: {
-          categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-          position: 'top',
-          axisBorder: {
-            show: false,
-          },
-          axisTicks: {
-            show: false,
-          },
-          crosshairs: {
-            fill: {
-              type: 'gradient',
-              gradient: {
-                colorFrom: '#D8E3F0',
-                colorTo: '#BED1E6',
-                stops: [0, 100],
-                opacityFrom: 0.4,
-                opacityTo: 0.5,
-              },
-            },
-          },
-          tooltip: {
-            enabled: true,
-          },
-        },
-        yaxis: {
-          axisBorder: {
-            show: false,
-          },
-          axisTicks: {
-            show: false,
-          },
-          labels: {
-            show: false,
-            formatter: function (val) {
-              return val + "%";
-            },
-          },
-        },
-        title: {
-          text: 'Monthly Inflation in Argentina, 2002',
-          floating: true,
-          offsetY: 330,
-          align: 'center',
-          style: {
-            color: '#444',
-          },
-        },
-      },
+        ],
+    });
+
+    const fetchBillingData = async () => {
+        try {
+            // Correct query string construction with proper encoding
+            const query = Object.keys(filters)
+                .map(key => filters[key] ? `${key}=${encodeURIComponent(filters[key])}` : '')
+                .filter(Boolean)
+                .join('&');
+
+            // Fetch data with filters applied
+            const response = await fetch(`http://localhost:5000/api/billing?${query}`);
+            const data = await response.json();
+
+            // Update the chart data
+            setChartData({
+                labels: data.map(item => item.billing_month),
+                datasets: [
+                    {
+                        label: 'Total Cost',
+                        data: data.map(item => item.total_cost),
+                        backgroundColor: 'rgba(75,192,192,0.6)',
+                    },
+                ],
+            });
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        }
     };
-  }
 
-  render() {
+    useEffect(() => {
+        fetchBillingData();  // Fetch billing data whenever filters change
+    }, [filters]);
+
     return (
-      <div>
-        <div id="chart">
-          <ReactApexChart
-            options={this.state.options}
-            series={this.state.series}
-            type="bar"
-            height={350}
-          />
+        <div>
+            <h1>AWS Billing Dashboard</h1>
+            <div>
+                <input
+                    type="text"
+                    placeholder="Account Name"
+                    value={filters.account_name}
+                    onChange={(e) => setFilters({ ...filters, account_name: e.target.value })}
+                />
+                <input
+                    type="text"
+                    placeholder="Application Name"
+                    value={filters.application_name}
+                    onChange={(e) => setFilters({ ...filters, application_name: e.target.value })}
+                />
+                <input
+                    type="text"
+                    placeholder="Environment"
+                    value={filters.environment}
+                    onChange={(e) => setFilters({ ...filters, environment: e.target.value })}
+                />
+                <input
+                    type="text"
+                    placeholder="Service"
+                    value={filters.service}
+                    onChange={(e) => setFilters({ ...filters, service: e.target.value })}
+                />
+            </div>
+            <Bar
+                data={chartData}
+                options={{
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'AWS Billing Costs (Last 6 Months)',
+                        },
+                        legend: {
+                            display: true,
+                        },
+                    },
+                }}
+            />
         </div>
-      </div>
     );
-  }
-}
+};
 
-export default FlowchartPage;
+export default FlowChartPage;
